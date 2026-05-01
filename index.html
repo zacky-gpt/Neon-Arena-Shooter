@@ -1,0 +1,67 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neon Arena Shooter</title>
+  <link rel="stylesheet" href="./styles/main.css" />
+</head>
+<body>
+  <div class="game-shell">
+    <canvas id="gameCanvas" width="1280" height="720" aria-label="2D shooter game"></canvas>
+    <div id="hint" class="hint">Choose a preset and start</div>
+
+    <div id="menuOverlay" class="menu-overlay">
+      <div class="menu-panel">
+        <p class="menu-eyebrow">Single Player Arena</p>
+        <h1 class="menu-title">Neon Arena Shooter</h1>
+        <p class="menu-copy">
+          まずはそのまま遊べる完成度を保ちつつ、ここから画像や敵、演出を増築しやすい構成に整理しました。
+          画面右下のアリーナに降りる前に、プリセットを選んでスタートできます。
+        </p>
+        <p class="menu-controls">Controls: `A / D` move, `Shift` crouch / roll / air dash, `Shift + S` dive, `W / Space` jump, hold `Space` to boost, right click chains into air kicks.</p>
+        <p class="menu-subtitle">Arena Presets</p>
+        <div class="preset-grid">
+          <button class="preset-button" data-preset="standard" type="button">
+            <span class="preset-name">Standard</span>
+            <span class="preset-desc">今の基本仕様に近い標準セット。</span>
+          </button>
+          <button class="preset-button" data-preset="duel" type="button">
+            <span class="preset-name">Duel</span>
+            <span class="preset-desc">俊敏なライバルと1対1で戦うモード。</span>
+          </button>
+          <button class="preset-button" data-preset="siege" type="button">
+            <span class="preset-name">Siege</span>
+            <span class="preset-desc">敵弾と近接の圧が少し強い緊張感寄り。</span>
+          </button>
+        </div>
+        <div id="presetSummary" class="preset-summary"></div>
+        <div class="menu-actions">
+          <button id="startButton" class="menu-start" type="button">Start Mission</button>
+          <div class="menu-footnote">
+            `Enter` か `Space` でも開始できます。ゲーム中は `Esc` でこの画面に戻れます。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./src/config.js"></script>
+  <script src="./src/data/weapons.js"></script>
+  <script src="./src/data/items.js"></script>
+  <script src="./src/platforms.js"></script>
+  <script src="./src/utils.js"></script>
+  <script src="./src/input.js"></script>
+  <script src="./src/entities/particle.js"></script>
+  <script src="./src/entities/bullet.js"></script>
+  <script src="./src/entities/enemy.js"></script>
+  <script src="./src/entities/pickup.js"></script>
+  <script src="./src/entities/player.js"></script>
+  <script src="./src/game.js"></script>
+  <script src="./src/render.js"></script>
+  <script src="./src/main.js"></script>
+</body>
+</html>
+
+
+
