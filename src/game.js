@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 
 window.Game = class Game {
   constructor() {
@@ -18,7 +18,7 @@ window.Game = class Game {
     this.lastDropId = "none";
     this.lastDropRepeatCount = 0;
     this.pendingSpawns = [];
-    this.healSpawnTimers = [];
+    this.healSpawnTimer = 0;
     this.resetRepairSpawnTimers();
   }
 
@@ -129,11 +129,7 @@ window.Game = class Game {
       return 1;
     }
 
-    return clamp(
-      1 + (this.movementComboCount - 1) * CONFIG.movementCombo.scoreMultiplier,
-      1,
-      CONFIG.movementCombo.maxMultiplier
-    );
+    return 1 + (this.movementComboCount - 1) * CONFIG.movementCombo.scoreMultiplier;
   }
 
   getMovementComboShotBonus(baseDamage) {
@@ -146,6 +142,10 @@ window.Game = class Game {
 
   getEnemyMaxHp() {
     return Math.round(CONFIG.enemy.baseHp + (this.elapsed / 60) * CONFIG.enemy.hpGrowthPerMinute);
+  }
+
+  getEnemyLevel() {
+    return 1 + Math.floor(this.elapsed / CONFIG.enemy.levelInterval);
   }
 
   noteDropResult(dropId) {
@@ -195,12 +195,17 @@ window.Game = class Game {
   }
 
   resetRepairSpawnTimers() {
-    this.healSpawnTimers = this.getHealPlatforms().map(() => this.rollRepairSpawnDelay(true));
+    this.healSpawnTimer = this.rollRepairSpawnDelay(true);
   }
 
   rollRepairSpawnDelay(initial = false) {
     const delay = randomRange(CONFIG.healing.spawnIntervalMin, CONFIG.healing.spawnIntervalMax);
-    return initial ? delay * randomRange(0.45, 1) : delay;
+    return initial ? delay * randomRange(0.75, 1) : delay;
+  }
+
+  getCurrentRepairPackLimit() {
+    const reduced = this.elapsed >= CONFIG.healing.limitDropTime ? CONFIG.healing.limitDropAmount : 0;
+    return Math.max(1, CONFIG.healing.maxActivePacks - reduced);
   }
 
   countActiveRepairPacks() {
@@ -211,6 +216,21 @@ window.Game = class Game {
     return this.pickups.some((pickup) => pickup.alive && Math.hypot(pickup.centerX - x, pickup.centerY - y) < radius);
   }
 
+  getAvailableRepairPlatforms() {
+    return this.getHealPlatforms()
+      .map((platform, index) => ({ platform, index }))
+      .filter(({ platform, index }) => {
+        const occupied = this.pickups.some((pickup) => pickup.alive && pickup.itemId === "repairPack" && pickup.spawnPlatformIndex === index);
+        if (occupied) {
+          return false;
+        }
+
+        const centerX = platform.x + platform.width / 2;
+        const centerY = platform.y - 17;
+        return !this.hasPickupNear(centerX, centerY);
+      });
+  }
+
   spawnRepairPackAtPlatform(platformIndex) {
     const platform = this.getHealPlatforms()[platformIndex];
     if (!platform) {
@@ -219,10 +239,6 @@ window.Game = class Game {
 
     const spawnX = platform.x + platform.width / 2 - 17;
     const spawnY = platform.y - 34;
-    if (this.hasPickupNear(spawnX + 17, spawnY + 17)) {
-      return false;
-    }
-
     const pickup = new Pickup("repairPack", spawnX, spawnY);
     pickup.vx = 0;
     pickup.vy = 0;
@@ -233,34 +249,29 @@ window.Game = class Game {
   }
 
   updateRepairSpawns(dt) {
-    const healPlatforms = this.getHealPlatforms();
-    if (healPlatforms.length === 0 || !this.healSpawnTimers || this.healSpawnTimers.length !== healPlatforms.length) {
-      this.resetRepairSpawnTimers();
+    if (this.getHealPlatforms().length === 0) {
+      return;
     }
 
-    for (let i = 0; i < healPlatforms.length; i += 1) {
-      this.healSpawnTimers[i] -= dt;
-      if (this.healSpawnTimers[i] > 0) {
-        continue;
-      }
-
-      const occupied = this.pickups.some((pickup) => pickup.alive && pickup.itemId === "repairPack" && pickup.spawnPlatformIndex === i);
-      if (occupied) {
-        this.healSpawnTimers[i] = CONFIG.healing.retryDelay;
-        continue;
-      }
-
-      if (this.countActiveRepairPacks() >= CONFIG.healing.maxActivePacks) {
-        this.healSpawnTimers[i] = CONFIG.healing.retryDelay;
-        continue;
-      }
-
-      if (this.spawnRepairPackAtPlatform(i)) {
-        this.healSpawnTimers[i] = this.rollRepairSpawnDelay();
-      } else {
-        this.healSpawnTimers[i] = CONFIG.healing.retryDelay;
-      }
+    this.healSpawnTimer -= dt;
+    if (this.healSpawnTimer > 0) {
+      return;
     }
+
+    if (this.countActiveRepairPacks() >= this.getCurrentRepairPackLimit()) {
+      this.healSpawnTimer = CONFIG.healing.retryDelay;
+      return;
+    }
+
+    const candidates = this.getAvailableRepairPlatforms();
+    if (candidates.length === 0) {
+      this.healSpawnTimer = CONFIG.healing.retryDelay;
+      return;
+    }
+
+    const selected = candidates[Math.floor(Math.random() * candidates.length)];
+    this.spawnRepairPackAtPlatform(selected.index);
+    this.healSpawnTimer = this.rollRepairSpawnDelay();
   }
 
   pickEnemyType() {
@@ -288,10 +299,12 @@ window.Game = class Game {
     const rivalY = CONFIG.world.floorY - CONFIG.player.height;
     if (type === "rival") {
       const rivalPoints = [
-        { x: 120, y: rivalY },
-        { x: CONFIG.canvas.width - 160, y: rivalY },
+        { x: CONFIG.canvas.width * 0.2, y: rivalY },
+        { x: CONFIG.canvas.width * 0.8 - CONFIG.player.width, y: rivalY },
         { x: CONFIG.canvas.width * 0.28, y: 540 },
-        { x: CONFIG.canvas.width * 0.72, y: 540 },
+        { x: CONFIG.canvas.width * 0.72 - CONFIG.player.width, y: 540 },
+        { x: 170, y: 118 },
+        { x: CONFIG.canvas.width - 210, y: 118 },
       ];
       const point = rivalPoints[Math.floor(Math.random() * rivalPoints.length)];
       const speedBonus = (this.elapsed / 60) * CONFIG.enemy.speedGrowthPerMinute + this.score * 0.01;
@@ -393,7 +406,7 @@ window.Game = class Game {
       for (const enemy of this.enemies) {
         const bodyHit = circleIntersectsRect(bullet.x, bullet.y, bullet.radius, enemy.getBodyHitbox());
         const headshot = enemy.canHeadshot() && circleIntersectsRect(bullet.x, bullet.y, bullet.radius, enemy.getHeadHitbox());
-        if (enemy.defeated || (!bodyHit && !headshot)) {
+        if (enemy.defeated || !enemy.canBeDamaged() || (!bodyHit && !headshot)) {
           continue;
         }
 
@@ -422,7 +435,7 @@ window.Game = class Game {
     }
 
     for (const enemy of this.enemies) {
-      if (enemy.defeated || this.player.specialHitEnemies.has(enemy) || !rectsOverlap(special.hitbox, enemy)) {
+      if (enemy.defeated || !enemy.canBeDamaged() || this.player.specialHitEnemies.has(enemy) || !rectsOverlap(special.hitbox, enemy)) {
         continue;
       }
 
@@ -455,10 +468,10 @@ window.Game = class Game {
     }
 
     const meleeBox = this.player.getMeleeHitbox();
-    const direction = this.player.facing || 1;
+    const direction = this.player.getMeleeDirection();
 
     for (const enemy of this.enemies) {
-      if (enemy.defeated || this.player.meleeHitEnemies.has(enemy) || !rectsOverlap(meleeBox, enemy)) {
+      if (enemy.defeated || !enemy.canBeDamaged() || this.player.meleeHitEnemies.has(enemy) || !rectsOverlap(meleeBox, enemy)) {
         continue;
       }
 
@@ -578,7 +591,7 @@ window.Game = class Game {
     };
 
     for (const enemy of this.enemies) {
-      if (enemy.defeated || !rectsOverlap(shockwave, enemy)) {
+      if (enemy.defeated || !enemy.canBeDamaged() || !rectsOverlap(shockwave, enemy)) {
         continue;
       }
 
@@ -635,6 +648,7 @@ window.Game = class Game {
     }
   }
 };
+
 
 
 

@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 
 window.DEFAULT_CONFIG = {
   canvas: {
@@ -48,6 +48,8 @@ window.DEFAULT_CONFIG = {
     impulse: -430,
     maxRiseSpeed: -980,
     horizontalBoost: 120,
+    launchVelocity: -660,
+    upwardCarryFactor: 0.18,
   },
   airDash: {
     enabledByDefault: false,
@@ -126,6 +128,11 @@ window.DEFAULT_CONFIG = {
     respawnDelay: 1.25,
     rivalHpMultiplier: 1.85,
     rivalScoreValue: 220,
+    rivalShootMultiplier: 0.58,
+    rivalRollDuration: 0.34,
+    rivalRollSpeed: 860,
+    rivalRollCooldownMin: 1.8,
+    rivalRollCooldownMax: 3.2,
   },
   enemy: {
     width: 42,
@@ -154,15 +161,18 @@ window.DEFAULT_CONFIG = {
     spawnWarningDuration: 0.72,
     standoffStartTime: 85,
     droneStartTime: 165,
+    levelInterval: 45,
     headshotMultiplier: 1.45,
     hpBarWidth: 34,
     hpBarHeight: 5,
   },
   healing: {
-    spawnIntervalMin: 12,
-    spawnIntervalMax: 18,
-    retryDelay: 3.5,
+    spawnIntervalMin: 9.5,
+    spawnIntervalMax: 10.5,
+    retryDelay: 2.5,
     maxActivePacks: 3,
+    limitDropTime: 180,
+    limitDropAmount: 1,
   },
   drops: {
     weaponWeight: 4.8,
@@ -203,6 +213,8 @@ window.CONFIG_PRESETS = {
       },
       enemy: {
         spawnWarningDuration: 0.86,
+        shootIntervalMin: 1.35,
+        shootIntervalMax: 2.0,
       },
       duel: {
         respawnDelay: 1.45,
@@ -255,4 +267,5 @@ window.createConfig = function createConfig(presetKey) {
   const preset = window.CONFIG_PRESETS[presetKey] || window.CONFIG_PRESETS.standard;
   return window.mergeConfig(window.deepClone(window.DEFAULT_CONFIG), preset.overrides);
 };
+
 

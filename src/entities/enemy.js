@@ -15,12 +15,16 @@ window.Enemy = class Enemy {
     this.speed = (CONFIG.enemy.baseSpeed + speedBonus) * (this.type === "standoff" ? 0.88 : this.type === "drone" ? 0.94 : this.type === "rival" ? 1.18 : 1);
     this.contactCooldown = 0;
     this.contactDisabledTimer = 0;
-    this.shootCooldown = randomRange(CONFIG.enemy.shootIntervalMin, CONFIG.enemy.shootIntervalMax) * (this.type === "charger" ? 1.05 : this.type === "standoff" ? 0.9 : this.type === "rival" ? 0.82 : 0.82);
+    const rivalShootMultiplier = CONFIG.mode.type === "duel" ? CONFIG.duel.rivalShootMultiplier : 0.82;
+    this.shootCooldown = randomRange(CONFIG.enemy.shootIntervalMin, CONFIG.enemy.shootIntervalMax) * (this.type === "charger" ? 1.05 : this.type === "standoff" ? 0.9 : this.type === "rival" ? rivalShootMultiplier : 0.82);
     this.onGround = false;
     this.hoverPhase = randomRange(0, Math.PI * 2);
     this.preferredDistance = this.type === "charger" ? 0 : (this.type === "standoff" ? randomRange(300, 430) : this.type === "rival" ? randomRange(200, 300) : randomRange(200, 300));
     this.jumpCooldown = randomRange(0.35, 0.8);
     this.dashCooldown = randomRange(0.7, 1.1);
+    this.rivalRollTimer = 0;
+    this.rivalRollDirection = 1;
+    this.rivalRollCooldown = randomRange(CONFIG.duel.rivalRollCooldownMin, CONFIG.duel.rivalRollCooldownMax);
   }
 
   get centerX() {
@@ -38,6 +42,8 @@ window.Enemy = class Enemy {
 
     this.jumpCooldown -= dt;
     this.dashCooldown -= dt;
+    this.rivalRollCooldown -= dt;
+    this.rivalRollTimer = Math.max(0, this.rivalRollTimer - dt);
 
     if (this.type === "drone") {
       this.updateDrone(dt, player);
@@ -89,6 +95,12 @@ window.Enemy = class Enemy {
   updateRival(dt, player) {
     const direction = Math.sign(player.centerX - this.centerX) || 1;
     const distanceX = Math.abs(player.centerX - this.centerX);
+
+    if (this.rivalRollTimer > 0) {
+      this.updateRivalRoll(dt);
+      return;
+    }
+
     let desiredSpeed = direction * this.speed * 0.78;
 
     if (distanceX < this.preferredDistance * 0.72) {
@@ -98,6 +110,12 @@ window.Enemy = class Enemy {
     }
 
     this.vx = moveToward(this.vx, desiredSpeed, 2400 * dt);
+
+    if (this.onGround && this.rivalRollCooldown <= 0 && distanceX > 130 && distanceX < 320) {
+      this.startRivalRoll(direction);
+      this.updateRivalRoll(dt);
+      return;
+    }
 
     if (this.onGround && this.jumpCooldown <= 0 && (player.centerY < this.centerY - 36 || distanceX < 190)) {
       this.vy = CONFIG.player.jumpVelocity * 0.92;
@@ -129,6 +147,28 @@ window.Enemy = class Enemy {
     this.resolveVerticalCollisions(oldY, verticalSpeed);
   }
 
+  updateRivalRoll(dt) {
+    this.vx = moveToward(this.vx, this.rivalRollDirection * CONFIG.duel.rivalRollSpeed, CONFIG.player.acceleration * 1.2 * dt);
+    this.vy += CONFIG.world.gravity * dt;
+    this.vy = Math.min(this.vy, CONFIG.player.maxFallSpeed);
+
+    this.x += this.vx * dt;
+    this.resolveHorizontalCollisions();
+    this.constrainToArenaHorizontal();
+
+    const oldY = this.y;
+    const verticalSpeed = this.vy;
+    this.y += this.vy * dt;
+    this.resolveVerticalCollisions(oldY, verticalSpeed);
+  }
+
+  startRivalRoll(direction) {
+    this.rivalRollTimer = CONFIG.duel.rivalRollDuration;
+    this.rivalRollDirection = direction || 1;
+    this.rivalRollCooldown = randomRange(CONFIG.duel.rivalRollCooldownMin, CONFIG.duel.rivalRollCooldownMax);
+    this.vx = this.rivalRollDirection * CONFIG.duel.rivalRollSpeed;
+  }
+
   updateDrone(dt, player) {
     const direction = Math.sign(player.centerX - this.centerX) || 1;
     const distanceX = Math.abs(player.centerX - this.centerX);
@@ -154,6 +194,10 @@ window.Enemy = class Enemy {
   }
 
   tryShoot(player, game) {
+    if (this.type === "rival" && this.rivalRollTimer > 0) {
+      return;
+    }
+
     const muzzleY = this.type === "drone" ? this.centerY : this.type === "rival" ? this.y + 28 : this.y + 22;
     const dx = player.centerX - this.centerX;
     const dy = player.centerY - muzzleY;
@@ -171,7 +215,8 @@ window.Enemy = class Enemy {
       Math.sin(angle) * CONFIG.enemy.bulletSpeed * speedMultiplier
     ));
 
-    this.shootCooldown = randomRange(CONFIG.enemy.shootIntervalMin, CONFIG.enemy.shootIntervalMax) * (this.type === "charger" ? 1.02 : this.type === "standoff" ? 0.86 : this.type === "rival" ? 0.7 : 0.76);
+    const rivalShootMultiplier = CONFIG.mode.type === "duel" ? CONFIG.duel.rivalShootMultiplier : 0.7;
+    this.shootCooldown = randomRange(CONFIG.enemy.shootIntervalMin, CONFIG.enemy.shootIntervalMax) * (this.type === "charger" ? 1.02 : this.type === "standoff" ? 0.86 : this.type === "rival" ? rivalShootMultiplier : 0.76);
 
     for (let i = 0; i < 5; i += 1) {
       game.particles.push(new Particle({
@@ -251,6 +296,9 @@ window.Enemy = class Enemy {
     this.contactDisabledTimer = Math.max(this.contactDisabledTimer, duration);
   }
 
+  canBeDamaged() {
+    return !(this.type === "rival" && this.rivalRollTimer > 0);
+  }
 
   getHeadHitbox() {
     if (this.type === "drone") {
@@ -288,7 +336,7 @@ window.Enemy = class Enemy {
   }
 
   canHeadshot() {
-    return this.type !== "drone";
+    return this.type !== "drone" && this.canBeDamaged();
   }
 
   getHpBarRect() {
@@ -300,8 +348,9 @@ window.Enemy = class Enemy {
       height: CONFIG.enemy.hpBarHeight,
     };
   }
+
   canDamagePlayer() {
-    return this.contactCooldown <= 0 && this.contactDisabledTimer <= 0;
+    return this.contactCooldown <= 0 && this.contactDisabledTimer <= 0 && !(this.type === "rival" && this.rivalRollTimer > 0);
   }
 
   markDamageDealt() {
@@ -331,6 +380,17 @@ window.Enemy = class Enemy {
     }
 
     if (this.type === "rival") {
+      if (this.rivalRollTimer > 0) {
+        ctx.fillStyle = "#4ce0b5";
+        roundRect(ctx, -26, -12, 52, 22, 10);
+        ctx.fill();
+        ctx.fillStyle = "#8ef3d6";
+        roundRect(ctx, -22, -4, 44, 8, 4);
+        ctx.fill();
+        ctx.restore();
+        return;
+      }
+
       ctx.fillStyle = "#4ce0b5";
       roundRect(ctx, -15, -32, 30, 42, 9);
       ctx.fill();

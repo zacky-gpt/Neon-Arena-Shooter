@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 
 window.drawBackground = function drawBackground(ctx) {
   ctx.clearRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
@@ -64,8 +64,9 @@ window.drawUi = function drawUi(ctx, game) {
   const weaponRatio = weaponProgress.isMax ? 1 : weaponProgress.current / weaponProgress.needed;
   const tokens = game.player.getActionTokens();
   const comboMultiplier = game.getMovementComboMultiplier();
-  const panelY = CONFIG.canvas.height - 92;
-  const panelHeight = 92;
+  const enemyLevel = game.getEnemyLevel();
+  const panelY = CONFIG.canvas.height - 84;
+  const panelHeight = 80;
   const scoreX = CONFIG.canvas.width - 252;
 
   ctx.save();
@@ -79,37 +80,39 @@ window.drawUi = function drawUi(ctx, game) {
 
   ctx.fillStyle = "#dce9f6";
   ctx.font = "bold 15px 'Segoe UI', sans-serif";
-  ctx.fillText("HP", 28, panelY + 23);
-  ctx.fillText("BOOST", 28, panelY + 48);
-  ctx.fillText("W CORE", 28, panelY + 73);
+  ctx.fillText("HP", 28, panelY + 21);
+  ctx.fillText("BOOST", 28, panelY + 43);
+  ctx.fillText("W CORE", 28, panelY + 65);
 
-  drawBar(ctx, 92, panelY + 9, 220, CONFIG.ui.barHeight, hpRatio, "#ff6170", "#66242f");
-  drawBar(ctx, 92, panelY + 34, 220, CONFIG.ui.barHeight, boostRatio, boostLocked ? "#ffc14d" : "#47ddff", boostLocked ? "#52411b" : "#17384a");
-  drawBar(ctx, 92, panelY + 59, 220, CONFIG.ui.barHeight, weaponRatio, weaponProgress.isMax ? "#8ef3ff" : "#ffb870", weaponProgress.isMax ? "#1a4250" : "#4d3320");
+  drawBar(ctx, 92, panelY + 6, 220, CONFIG.ui.barHeight, hpRatio, "#ff6170", "#66242f");
+  drawBar(ctx, 92, panelY + 28, 220, CONFIG.ui.barHeight, boostRatio, boostLocked ? "#ffc14d" : "#47ddff", boostLocked ? "#52411b" : "#17384a");
+  drawBar(ctx, 92, panelY + 50, 220, CONFIG.ui.barHeight, weaponRatio, weaponProgress.isMax ? "#8ef3ff" : "#ffb870", weaponProgress.isMax ? "#1a4250" : "#4d3320");
 
   ctx.font = "12px 'Segoe UI', sans-serif";
   ctx.fillStyle = "rgba(220, 233, 246, 0.78)";
-  ctx.fillText(boostLocked ? `Cooldown ${game.player.boostLockTimer.toFixed(1)}s` : "Boost ready", 92, panelY + 88);
-  ctx.fillText(weaponProgress.isMax ? "Stage MAX" : `${weaponProgress.current}/${weaponProgress.needed} caches to next stage`, 92, panelY + 76);
+  ctx.fillText(boostLocked ? `Cooldown ${game.player.boostLockTimer.toFixed(1)}s` : "Boost ready", 92, panelY + 76);
+  ctx.fillText(weaponProgress.isMax ? "Stage MAX" : `${weaponProgress.current}/${weaponProgress.needed} caches to next stage`, 92, panelY + 66);
 
   ctx.fillStyle = "rgba(220, 233, 246, 0.92)";
   ctx.font = "14px 'Segoe UI', sans-serif";
-  ctx.fillText(`Ranged  ${weapon.label}`, 350, panelY + 23);
-  ctx.fillText(`Stage  ${game.player.weaponStage + 1}/${game.player.weaponStageCount}   Damage ${weapon.projectileDamage}   Fire ${weapon.fireRate.toFixed(2)}s`, 350, panelY + 48);
-  ctx.fillText(`Melee  ${game.player.meleeWeaponLabel}`, 350, panelY + 73);
+  ctx.fillText(`Ranged  ${weapon.label}`, 350, panelY + 21);
+  ctx.fillText(`Stage  ${game.player.weaponStage + 1}/${game.player.weaponStageCount}   Damage ${weapon.projectileDamage}   Fire ${weapon.fireRate.toFixed(2)}s`, 350, panelY + 43);
+  ctx.fillText(`Melee  ${game.player.meleeWeaponLabel}`, 350, panelY + 65);
 
   ctx.fillStyle = "rgba(220, 233, 246, 0.86)";
-  ctx.fillText("Actions", 760, panelY + 23);
-  drawActionTokens(ctx, 760, panelY + 34, tokens);
+  ctx.fillText("Actions", 760, panelY + 21);
+  drawActionTokens(ctx, 760, panelY + 28, tokens);
 
   ctx.fillStyle = game.movementComboCount > 1 ? "#9ef7ff" : "rgba(220, 233, 246, 0.5)";
   ctx.font = game.movementComboCount > 1 ? "bold 14px 'Segoe UI', sans-serif" : "12px 'Segoe UI', sans-serif";
-  ctx.fillText(game.movementComboCount > 0 ? `MOVE COMBO x${game.movementComboCount}  ${comboMultiplier.toFixed(2)}x shot` : "MOVE COMBO idle", 760, panelY + 78);
+  ctx.fillText(game.movementComboCount > 0 ? `MOVE COMBO x${game.movementComboCount}  ${comboMultiplier.toFixed(2)}x shot` : "MOVE COMBO idle", 760, panelY + 68);
 
   ctx.fillStyle = "#dce9f6";
   ctx.font = "bold 18px 'Segoe UI', sans-serif";
-  ctx.fillText(`SCORE  ${String(game.score).padStart(5, "0")}`, scoreX, panelY + 30);
-  ctx.fillText(`TIME  ${formatTime(game.elapsed)}`, scoreX, panelY + 58);
+  ctx.fillText(`SCORE  ${String(game.score).padStart(5, "0")}`, scoreX, panelY + 27);
+  ctx.fillText(`TIME  ${formatTime(game.elapsed)}`, scoreX, panelY + 53);
+  ctx.font = "bold 16px 'Segoe UI', sans-serif";
+  ctx.fillText(`LEVEL  ${enemyLevel}`, scoreX, panelY + 76);
   ctx.restore();
 };
 

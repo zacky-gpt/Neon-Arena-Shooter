@@ -116,6 +116,10 @@ window.Player = class Player {
     };
   }
 
+  getMeleeDirection() {
+    return Math.sign(input.mouseX - this.centerX) || this.facing || 1;
+  }
+
   get isMeleeActive() {
     return this.meleeTimer > 0;
   }
@@ -190,7 +194,7 @@ window.Player = class Player {
   }
 
   getMeleeHitbox() {
-    const direction = this.facing || 1;
+    const direction = this.getMeleeDirection();
     return {
       x: direction > 0 ? this.centerX + 8 : this.centerX - CONFIG.melee.range,
       y: this.centerY - CONFIG.melee.height * 0.55,
@@ -418,7 +422,8 @@ window.Player = class Player {
   startDoubleJump(moveInput, game) {
     game.registerMovementAction("doubleJump");
     this.doubleJumpAvailable = false;
-    this.vy = Math.max(this.vy + CONFIG.doubleJump.impulse, CONFIG.doubleJump.maxRiseSpeed);
+    const carryRise = Math.min(this.vy, 0) * CONFIG.doubleJump.upwardCarryFactor;
+    this.vy = Math.max(CONFIG.doubleJump.launchVelocity + carryRise, CONFIG.doubleJump.maxRiseSpeed);
     if (moveInput !== 0) {
       this.facing = Math.sign(moveInput);
       this.vx = clamp(this.vx + moveInput * CONFIG.doubleJump.horizontalBoost, -CONFIG.airDash.speed, CONFIG.airDash.speed);
@@ -866,6 +871,7 @@ window.Player = class Player {
       return;
     }
 
+    this.facing = this.getMeleeDirection();
     this.meleeCooldown = CONFIG.melee.cooldown;
     this.meleeTimer = CONFIG.melee.activeTime;
     this.meleeHitEnemies.clear();
@@ -968,7 +974,8 @@ window.Player = class Player {
       ctx.strokeStyle = "rgba(132, 245, 255, 0.75)";
       ctx.lineWidth = 8;
       ctx.beginPath();
-      if (this.facing > 0) {
+      const meleeDirection = this.getMeleeDirection();
+      if (meleeDirection > 0) {
         ctx.arc(18, -32, 42, -1.0, 0.4);
       } else {
         ctx.arc(-18, -32, 42, Math.PI - 0.4, Math.PI + 1.0);

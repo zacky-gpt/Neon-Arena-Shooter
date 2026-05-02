@@ -1,119 +1,68 @@
-# Browser Shooter Structure
+﻿# Browser Shooter
 
-## Overview
+ブラウザで直接遊べる、2Dアクションシューティングです。  
+`index.html` を開くだけで起動でき、現在は `Standard / Duel / Siege` の3モードを持っています。
 
-This project is split so it can still be opened directly with `index.html`, while staying easier to expand with images, sounds, and new gameplay systems.
+## 現在の特徴
 
-## File Layout
+- マウス照準射撃
+- ローリング、ブースト、エアダッシュ、二段ジャンプ、急降下
+- 飛び蹴り、急降下キック、衝撃波
+- 武器進化型の `W CORE` システム
+- 能力解放型の空中アクション成長
+- 敵弾、ヘッドショット、スポーン予告
+- `Duel` 用のライバルAI
+
+## 起動方法
+
+`index.html` をブラウザで開いてください。
+
+## 主なファイル
 
 - `index.html`
-  - The entry point.
-  - Loads the canvas, title screen UI, and all script files in order.
+  - エントリーポイント
 - `styles/main.css`
-  - All page, canvas shell, title screen, and menu styling.
+  - 画面全体とメニューUI
 - `src/config.js`
-  - The main balance and behavior settings.
-  - If you want to tune gameplay first, start here.
+  - バランス調整の中心
 - `src/platforms.js`
-  - Defines the arena floor and platforms.
-- `src/data/weapons.js`
-  - Data definitions for ranged weapon behavior and projectile stats.
-- `src/data/items.js`
-  - Data definitions for pickup items, including weapon progression, healing, and ability unlocks.
-- `src/utils.js`
-  - Shared helper functions like collision checks, clamping, and formatting.
-- `src/input.js`
-  - Keyboard and mouse input handling.
+  - ステージ足場
 - `src/game.js`
-  - Main game loop state for enemies, bullets, particles, pickups, score, and hit handling.
+  - ゲーム進行、敵、得点、スポーン管理
 - `src/render.js`
-  - Drawing code for the arena, UI, title background, and overlays.
-- `src/main.js`
-  - App bootstrapping.
-  - Connects title screen, presets, input setup, and the main animation loop.
+  - 描画とHUD
 - `src/entities/player.js`
-  - Player movement, roll, jump, boost, air dash unlocks, shooting, melee, and drawing.
+  - プレイヤー移動、戦闘、空中アクション
 - `src/entities/enemy.js`
-  - Enemy movement, enemy shooting, and drawing.
-- `src/entities/pickup.js`
-  - Dropped item behavior, gravity, and collection visuals.
-- `src/entities/bullet.js`
-  - Player bullet and enemy bullet classes.
-- `src/entities/particle.js`
-  - Particle effects.
-
-## First Places To Edit
-
-### Balance tuning
-
-Edit `src/config.js`.
-
-Important sections:
-- `player`: movement speed, HP, shot speed, damage, landing lag
-- `boost`: boost drain, recovery, acceleration, cooldown after empty
-- `airDash`: dash speed, duration, cooldown, and default unlock state
-- `roll`: roll timing and inertia
-- `melee`: kick range, damage, knockback
-- `enemy`: spawn rate, bullet speed, damage, fire interval
-- `drops`: enemy drop chances for weapons, ability modules, and repair packs
-
-### Bullet and platform collision
-
-Edit these flags in `src/config.js`:
-- `player.bulletHitsPlatforms`
-- `enemy.bulletHitsPlatforms`
-
-Current defaults:
-- Player bullets collide with platforms
-- Enemy bullets collide with platforms
-
-### Weapon growth and unlock items
-
-Edit:
+  - 敵AIと敵挙動
 - `src/data/weapons.js`
+  - 武器進化データ
 - `src/data/items.js`
-- `src/config.js`
+  - アイテム定義
 
-Current examples:
-- enemies can drop `Weapon Cache`, which fills the W gauge and upgrades the gun every 10 pickups
-- enemies can drop `Air Dash Module`, which unlocks `Shift + move` air dash
-- enemies can drop `Repair Pack`, which restores a small amount of HP when you are hurt
+## 最初に触る場所
 
-### Stage layout
+- ゲームバランス調整
+  - `src/config.js`
+- プレイヤー挙動
+  - `src/entities/player.js`
+- 敵挙動
+  - `src/entities/enemy.js`
+- ステージ構成
+  - `src/platforms.js`
 
-Edit `src/platforms.js`.
+## ドキュメント
 
-### Title screen presets
+- 現状の詳細仕様
+  - `docs/CURRENT_SPEC.md`
+- 今後の拡張設計
+  - `docs/EXPANSION_PLAN.md`
 
-Edit `CONFIG_PRESETS` in `src/config.js`.
+## 追加アセットを入れるなら
 
-## Adding Assets Later
+おすすめ構成:
 
-Recommended folders to add next:
 - `assets/images/`
 - `assets/audio/`
 
-Suggested examples:
-- `assets/images/player/`
-- `assets/images/enemies/`
-- `assets/images/ui/`
-- `assets/audio/sfx/`
-- `assets/audio/music/`
-
-Keep paths relative to `index.html` or the current script file structure so the project stays portable.
-
-## Portability Notes
-
-- The current setup avoids absolute paths.
-- It is designed to keep working when the whole folder is moved as-is.
-- Because scripts are loaded with normal `<script src="...">` tags, it still works with local `file://` opening.
-
-## Safe Expansion Strategy
-
-If you keep building this project, a good order is:
-1. Add image assets and swap simple shapes for sprites.
-2. Add sound effects.
-3. Add more enemy types.
-4. Add title/settings persistence with `localStorage`.
-5. Add waves, boss fights, and stage variations.
-
+今の構成は相対パス前提なので、フォルダごと移動しても壊れにくい作りです。
