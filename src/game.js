@@ -18,6 +18,8 @@ window.Game = class Game {
     this.lastDropId = "none";
     this.lastDropRepeatCount = 0;
     this.pendingSpawns = [];
+    this.healSpawnTimers = [];
+    this.resetRepairSpawnTimers();
   }
 
   reset() {
@@ -35,6 +37,7 @@ window.Game = class Game {
     this.lastDropId = "none";
     this.lastDropRepeatCount = 0;
     this.pendingSpawns = [];
+    this.resetRepairSpawnTimers();
   }
 
   update(dt) {
@@ -59,6 +62,7 @@ window.Game = class Game {
     this.player.update(dt, this);
     this.updateSpawns();
     this.updatePendingSpawns(dt);
+    this.updateRepairSpawns(dt);
 
     for (const bullet of this.bullets) {
       bullet.update(dt);
@@ -166,9 +170,6 @@ window.Game = class Game {
       entries.push({ id: "airDashModule", weight: CONFIG.drops.airDashWeight });
     }
 
-    if (this.player.hp < CONFIG.player.maxHp) {
-      entries.push({ id: "repairPack", weight: CONFIG.drops.healWeight });
-    }
 
     for (const entry of entries) {
       if (entry.id === this.lastDropId) {
@@ -187,6 +188,79 @@ window.Game = class Game {
     }
 
     return entries[entries.length - 1].id;
+  }
+
+  getHealPlatforms() {
+    return platforms.filter((platform) => platform.type === "platform");
+  }
+
+  resetRepairSpawnTimers() {
+    this.healSpawnTimers = this.getHealPlatforms().map(() => this.rollRepairSpawnDelay(true));
+  }
+
+  rollRepairSpawnDelay(initial = false) {
+    const delay = randomRange(CONFIG.healing.spawnIntervalMin, CONFIG.healing.spawnIntervalMax);
+    return initial ? delay * randomRange(0.45, 1) : delay;
+  }
+
+  countActiveRepairPacks() {
+    return this.pickups.filter((pickup) => pickup.alive && pickup.itemId === "repairPack").length;
+  }
+
+  hasPickupNear(x, y, radius = 42) {
+    return this.pickups.some((pickup) => pickup.alive && Math.hypot(pickup.centerX - x, pickup.centerY - y) < radius);
+  }
+
+  spawnRepairPackAtPlatform(platformIndex) {
+    const platform = this.getHealPlatforms()[platformIndex];
+    if (!platform) {
+      return false;
+    }
+
+    const spawnX = platform.x + platform.width / 2 - 17;
+    const spawnY = platform.y - 34;
+    if (this.hasPickupNear(spawnX + 17, spawnY + 17)) {
+      return false;
+    }
+
+    const pickup = new Pickup("repairPack", spawnX, spawnY);
+    pickup.vx = 0;
+    pickup.vy = 0;
+    pickup.onGround = true;
+    pickup.spawnPlatformIndex = platformIndex;
+    this.pickups.push(pickup);
+    return true;
+  }
+
+  updateRepairSpawns(dt) {
+    const healPlatforms = this.getHealPlatforms();
+    if (healPlatforms.length === 0 || !this.healSpawnTimers || this.healSpawnTimers.length !== healPlatforms.length) {
+      this.resetRepairSpawnTimers();
+    }
+
+    for (let i = 0; i < healPlatforms.length; i += 1) {
+      this.healSpawnTimers[i] -= dt;
+      if (this.healSpawnTimers[i] > 0) {
+        continue;
+      }
+
+      const occupied = this.pickups.some((pickup) => pickup.alive && pickup.itemId === "repairPack" && pickup.spawnPlatformIndex === i);
+      if (occupied) {
+        this.healSpawnTimers[i] = CONFIG.healing.retryDelay;
+        continue;
+      }
+
+      if (this.countActiveRepairPacks() >= CONFIG.healing.maxActivePacks) {
+        this.healSpawnTimers[i] = CONFIG.healing.retryDelay;
+        continue;
+      }
+
+      if (this.spawnRepairPackAtPlatform(i)) {
+        this.healSpawnTimers[i] = this.rollRepairSpawnDelay();
+      } else {
+        this.healSpawnTimers[i] = CONFIG.healing.retryDelay;
+      }
+    }
   }
 
   pickEnemyType() {

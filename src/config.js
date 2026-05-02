@@ -158,6 +158,12 @@ window.DEFAULT_CONFIG = {
     hpBarWidth: 34,
     hpBarHeight: 5,
   },
+  healing: {
+    spawnIntervalMin: 12,
+    spawnIntervalMax: 18,
+    retryDelay: 3.5,
+    maxActivePacks: 3,
+  },
   drops: {
     weaponWeight: 4.8,
     airDashWeight: 1.2,

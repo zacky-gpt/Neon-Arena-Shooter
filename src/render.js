@@ -64,56 +64,52 @@ window.drawUi = function drawUi(ctx, game) {
   const weaponRatio = weaponProgress.isMax ? 1 : weaponProgress.current / weaponProgress.needed;
   const tokens = game.player.getActionTokens();
   const comboMultiplier = game.getMovementComboMultiplier();
+  const panelY = CONFIG.canvas.height - 92;
+  const panelHeight = 92;
+  const scoreX = CONFIG.canvas.width - 252;
 
   ctx.save();
-  ctx.fillStyle = "rgba(5, 10, 16, 0.76)";
-  roundRect(ctx, 16, 12, CONFIG.canvas.width - 32, 112, 18);
+  ctx.font = "13px 'Segoe UI', sans-serif";
+  ctx.fillStyle = "rgba(220, 233, 246, 0.72)";
+  ctx.fillText("A/D Move   Shift Roll/AirDash   Shift+W DoubleJump/HighJump   Shift+S Dive   W/Space Jump   Hold Space Boost   LMB Fire   RMB Kick   R Restart   Esc Title", 28, 22);
+
+  ctx.fillStyle = "rgba(5, 10, 16, 0.8)";
+  roundRect(ctx, 16, panelY, CONFIG.canvas.width - 32, panelHeight, 18);
   ctx.fill();
 
   ctx.fillStyle = "#dce9f6";
   ctx.font = "bold 15px 'Segoe UI', sans-serif";
-  ctx.fillText("HP", 28, 32);
-  ctx.fillText("BOOST", 28, 60);
-  ctx.fillText("W CORE", 28, 88);
+  ctx.fillText("HP", 28, panelY + 23);
+  ctx.fillText("BOOST", 28, panelY + 48);
+  ctx.fillText("W CORE", 28, panelY + 73);
 
-  drawBar(ctx, 92, 18, 220, CONFIG.ui.barHeight, hpRatio, "#ff6170", "#66242f");
-  drawBar(ctx, 92, 46, 220, CONFIG.ui.barHeight, boostRatio, boostLocked ? "#ffc14d" : "#47ddff", boostLocked ? "#52411b" : "#17384a");
-  drawBar(ctx, 92, 74, 220, CONFIG.ui.barHeight, weaponRatio, weaponProgress.isMax ? "#8ef3ff" : "#ffb870", weaponProgress.isMax ? "#1a4250" : "#4d3320");
+  drawBar(ctx, 92, panelY + 9, 220, CONFIG.ui.barHeight, hpRatio, "#ff6170", "#66242f");
+  drawBar(ctx, 92, panelY + 34, 220, CONFIG.ui.barHeight, boostRatio, boostLocked ? "#ffc14d" : "#47ddff", boostLocked ? "#52411b" : "#17384a");
+  drawBar(ctx, 92, panelY + 59, 220, CONFIG.ui.barHeight, weaponRatio, weaponProgress.isMax ? "#8ef3ff" : "#ffb870", weaponProgress.isMax ? "#1a4250" : "#4d3320");
 
   ctx.font = "12px 'Segoe UI', sans-serif";
   ctx.fillStyle = "rgba(220, 233, 246, 0.78)";
-  ctx.fillText(boostLocked ? `Cooldown ${game.player.boostLockTimer.toFixed(1)}s` : "Hold Space to boost upward / soften landings", 92, 111);
-  ctx.fillText(weaponProgress.isMax ? "Stage MAX" : `${weaponProgress.current}/${weaponProgress.needed} caches to next stage`, 92, 91);
+  ctx.fillText(boostLocked ? `Cooldown ${game.player.boostLockTimer.toFixed(1)}s` : "Boost ready", 92, panelY + 88);
+  ctx.fillText(weaponProgress.isMax ? "Stage MAX" : `${weaponProgress.current}/${weaponProgress.needed} caches to next stage`, 92, panelY + 76);
 
   ctx.fillStyle = "rgba(220, 233, 246, 0.92)";
   ctx.font = "14px 'Segoe UI', sans-serif";
-  ctx.fillText(`Ranged  ${weapon.label}`, 350, 34);
-  ctx.fillText(`Stage  ${game.player.weaponStage + 1}/${game.player.weaponStageCount}   Damage ${weapon.projectileDamage}   Fire ${weapon.fireRate.toFixed(2)}s`, 350, 58);
-  ctx.fillText(`Melee  ${game.player.meleeWeaponLabel}`, 350, 82);
+  ctx.fillText(`Ranged  ${weapon.label}`, 350, panelY + 23);
+  ctx.fillText(`Stage  ${game.player.weaponStage + 1}/${game.player.weaponStageCount}   Damage ${weapon.projectileDamage}   Fire ${weapon.fireRate.toFixed(2)}s`, 350, panelY + 48);
+  ctx.fillText(`Melee  ${game.player.meleeWeaponLabel}`, 350, panelY + 73);
 
   ctx.fillStyle = "rgba(220, 233, 246, 0.86)";
-  ctx.fillText("Actions", 760, 34);
-  drawActionTokens(ctx, 760, 48, tokens);
+  ctx.fillText("Actions", 760, panelY + 23);
+  drawActionTokens(ctx, 760, panelY + 34, tokens);
 
   ctx.fillStyle = game.movementComboCount > 1 ? "#9ef7ff" : "rgba(220, 233, 246, 0.5)";
-  ctx.font = game.movementComboCount > 1 ? "bold 15px 'Segoe UI', sans-serif" : "13px 'Segoe UI', sans-serif";
-  ctx.fillText(
-    game.movementComboCount > 0
-      ? `MOVE COMBO x${game.movementComboCount}  ${comboMultiplier.toFixed(2)}x shot bonus`
-      : "MOVE COMBO idle",
-    CONFIG.canvas.width - 430,
-    36
-  );
+  ctx.font = game.movementComboCount > 1 ? "bold 14px 'Segoe UI', sans-serif" : "12px 'Segoe UI', sans-serif";
+  ctx.fillText(game.movementComboCount > 0 ? `MOVE COMBO x${game.movementComboCount}  ${comboMultiplier.toFixed(2)}x shot` : "MOVE COMBO idle", 760, panelY + 78);
 
   ctx.fillStyle = "#dce9f6";
-  ctx.font = "bold 22px 'Segoe UI', sans-serif";
-  ctx.fillText(`SCORE  ${String(game.score).padStart(5, "0")}`, CONFIG.canvas.width - 430, 74);
-  ctx.fillText(`TIME  ${formatTime(game.elapsed)}`, CONFIG.canvas.width - 430, 104);
-
-  ctx.font = "13px 'Segoe UI', sans-serif";
-  ctx.fillStyle = "rgba(220, 233, 246, 0.8)";
-  ctx.fillText("A / D Move   Shift Roll / AirDash   Air Shift + W DoubleJump   Shift + S Dive   Ground Shift + W HighJump", 28, CONFIG.canvas.height - 28);
-  ctx.fillText("W / Space Jump   Hold Space Boost   Left Click Fire   Right Click Kick / Air Kick   R Restart   Esc Title", 28, CONFIG.canvas.height - 8);
+  ctx.font = "bold 18px 'Segoe UI', sans-serif";
+  ctx.fillText(`SCORE  ${String(game.score).padStart(5, "0")}`, scoreX, panelY + 30);
+  ctx.fillText(`TIME  ${formatTime(game.elapsed)}`, scoreX, panelY + 58);
   ctx.restore();
 };
 
