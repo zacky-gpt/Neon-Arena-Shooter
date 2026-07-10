@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 
 window.Player = class Player {
   constructor() {
@@ -914,64 +914,249 @@ window.Player = class Player {
   draw(ctx) {
     const angle = this.aimAngle;
     const blink = this.invulnerableTimer > 0 && Math.floor(this.invulnerableTimer * 18) % 2 === 0;
-    const bodyColor = blink ? "#8de9ff" : "#38a8ff";
     const bottom = this.y + this.height;
+    const aimDir = Math.cos(angle) >= 0 ? 1 : -1;
+    const now = performance.now() / 1000;
+
+    const armor = blink ? "#aeeeff" : "#2f9bf2";
+    const armorEdge = blink ? "#e6fbff" : "#6fd0ff";
+    const suit = blink ? "#3d6d8a" : "#0f2438";
+    const accent = "#8df3ff";
 
     ctx.save();
     ctx.translate(this.centerX, bottom);
 
-    if (this.isRolling) {
-      const spin = -0.18 * this.rollDirection + clamp(this.vx / 1500, -0.32, 0.32);
-      ctx.rotate(spin);
-      ctx.fillStyle = bodyColor;
-      roundRect(ctx, -24, -22, 48, 24, 12);
-      ctx.fill();
-      ctx.fillStyle = "#bcefff";
+    // Soft contact shadow keeps the figure grounded
+    if (this.onGround) {
+      ctx.fillStyle = "rgba(2, 8, 14, 0.45)";
       ctx.beginPath();
-      ctx.arc(14 * this.rollDirection, -10, 11, 0, Math.PI * 2);
+      ctx.ellipse(0, 2, 23, 5, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = "#5ed9ff";
-      roundRect(ctx, -18, -10, 26, 8, 4);
+    }
+
+    ctx.shadowBlur = 14;
+    ctx.shadowColor = blink ? "rgba(170, 240, 255, 0.95)" : "rgba(56, 168, 255, 0.6)";
+
+    if (this.isRolling) {
+      const spin = this.x * 0.09 * this.rollDirection;
+
+      // Motion streaks trail the tuck
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = "rgba(90, 210, 255, 0.3)";
+      ctx.lineWidth = 2;
+      for (let i = 1; i <= 3; i += 1) {
+        ctx.beginPath();
+        ctx.arc(-i * 9 * this.rollDirection, -16, 16 - i * 2.5, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(0, -16);
+      ctx.rotate(spin);
+      ctx.fillStyle = armor;
+      ctx.beginPath();
+      ctx.arc(0, 0, 17, 0, Math.PI * 2);
       ctx.fill();
+      ctx.fillStyle = suit;
+      ctx.beginPath();
+      ctx.arc(0, 0, 10.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, 13.5, 0.2, 1.7);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, 13.5, Math.PI + 0.2, Math.PI + 1.7);
+      ctx.stroke();
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.arc(0, 0, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
       ctx.restore();
       return;
     }
 
     const crouchPose = this.isCrouching || this.landingLagTimer > 0;
-    const bodyTop = crouchPose ? -40 : -58;
-    const bodyHeight = crouchPose ? 28 : 40;
-    const legTop = crouchPose ? -18 : -20;
-    const legHeight = crouchPose ? 18 : 28;
-    const headY = crouchPose ? -50 : -68;
-    const gunOriginY = crouchPose ? -34 : -42;
+    const hipY = crouchPose ? -16 : -24;
+    const torsoTop = crouchPose ? -42 : -56;
+    const headY = crouchPose ? -51 : -66;
+    const gunY = crouchPose ? -38 : -52;
+    const speedRatio = clamp(Math.abs(this.vx) / CONFIG.player.moveSpeed, 0, 1.35);
+    const runPhase = this.x * 0.055;
+    const lean = clamp(this.vx / 2600, -0.15, 0.15);
+    const f = this.facing || 1;
 
-    ctx.fillStyle = bodyColor;
-    roundRect(ctx, -15, bodyTop, 30, bodyHeight, 10);
-    ctx.fill();
+    // Two-segment legs with a run cycle driven by ground distance
+    const drawLeg = (hipX, phaseOffset, shade) => {
+      let footX;
+      let footY;
+      let kneeX;
+      let kneeY;
 
-    ctx.fillStyle = "#58d2ff";
-    roundRect(ctx, -12, legTop, 11, legHeight, 7);
-    roundRect(ctx, 1, legTop, 11, legHeight, 7);
-    ctx.fill();
+      if (this.onGround) {
+        const swing = Math.sin(runPhase + phaseOffset) * 13 * speedRatio;
+        const lift = Math.max(0, Math.cos(runPhase + phaseOffset)) * 7 * speedRatio;
+        footX = hipX * (crouchPose ? 1.9 : 1.2) + swing;
+        footY = -lift;
+        kneeX = (hipX + footX) / 2 + (crouchPose ? 8 : 3) * f;
+        kneeY = (hipY + footY) / 2 - 2;
+      } else if (hipX * f > 0) {
+        footX = hipX + 9 * f;
+        footY = this.vy < 0 ? -10 : -6;
+        kneeX = hipX + 8 * f;
+        kneeY = hipY + 9;
+      } else {
+        footX = hipX - 11 * f;
+        footY = hipY + 15;
+        kneeX = hipX - 2 * f;
+        kneeY = hipY + 6;
+      }
 
-    ctx.fillStyle = "#bcefff";
-    ctx.beginPath();
-    ctx.arc(0, headY, 16, 0, Math.PI * 2);
-    ctx.fill();
+      ctx.strokeStyle = shade;
+      ctx.lineWidth = 9;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(hipX, hipY);
+      ctx.quadraticCurveTo(kneeX, kneeY, footX, footY);
+      ctx.stroke();
 
+      ctx.fillStyle = armor;
+      roundRect(ctx, footX - 6, footY - 4, 12, 6, 3);
+      ctx.fill();
+
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.arc(kneeX, kneeY, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
+    drawLeg(-6, Math.PI, blink ? "#2f5872" : "#0a1a2a");
+    drawLeg(6, 0, suit);
+
+    // Torso and head lean into velocity
     ctx.save();
-    ctx.translate(0, gunOriginY);
-    ctx.rotate(angle);
-    ctx.fillStyle = "#d5f6ff";
-    roundRect(ctx, 2, -6, 44, 12, 5);
+    ctx.translate(0, hipY);
+    ctx.rotate(lean);
+
+    ctx.fillStyle = suit;
+    roundRect(ctx, -9, -6, 18, 11, 5);
     ctx.fill();
-    ctx.fillStyle = "#5ed9ff";
-    roundRect(ctx, 8, 6, 14, 10, 4);
+
+    const chestTop = torsoTop - hipY;
+    ctx.fillStyle = armor;
+    ctx.beginPath();
+    ctx.moveTo(-8, -1);
+    ctx.lineTo(-14, chestTop + 7);
+    ctx.quadraticCurveTo(-15, chestTop, -8, chestTop);
+    ctx.lineTo(8, chestTop);
+    ctx.quadraticCurveTo(15, chestTop, 14, chestTop + 7);
+    ctx.lineTo(8, -1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(214, 245, 255, 0.35)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Reactor core, pulsing
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const pulse = 0.75 + Math.sin(now * 5) * 0.25;
+    ctx.fillStyle = `rgba(150, 245, 255, ${0.28 * pulse})`;
+    ctx.beginPath();
+    ctx.arc(aimDir * 3, chestTop + 12, 8.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = `rgba(200, 250, 255, ${0.9 * pulse})`;
+    ctx.beginPath();
+    ctx.arc(aimDir * 3, chestTop + 12, 3.2, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
+    // Shoulder plates, heavier on the gun side
+    ctx.fillStyle = suit;
+    roundRect(ctx, -aimDir * 8 - 6, chestTop - 1, 12, 7, 4);
+    ctx.fill();
+    ctx.fillStyle = armorEdge;
+    roundRect(ctx, aimDir * 8 - 7, chestTop - 3, 14, 9, 4);
+    ctx.fill();
+
+    // Helmet with aim-facing visor and rear fin
+    const headLocal = headY - hipY;
+    ctx.fillStyle = suit;
+    ctx.beginPath();
+    ctx.arc(0, headLocal + 9, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = armorEdge;
+    ctx.beginPath();
+    ctx.moveTo(-aimDir * 8, headLocal - 6);
+    ctx.lineTo(-aimDir * 15, headLocal - 1);
+    ctx.lineTo(-aimDir * 8, headLocal + 3);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = armor;
+    roundRect(ctx, -10, headLocal - 9, 20, 19, 8);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(214, 245, 255, 0.35)";
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, -10, headLocal - 9, 20, 19, 8);
+    ctx.stroke();
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = "rgba(205, 251, 255, 0.95)";
+    roundRect(ctx, aimDir === 1 ? -2 : -11, headLocal - 3, 13, 4.5, 2.2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.restore();
+
+    // Weapon tracks the aim, kicks back while the fire cooldown drains
+    const weapon = this.currentWeapon;
+    const recoil = weapon ? clamp(this.fireCooldown / Math.max(weapon.fireRate, 0.01), 0, 1) * 4 : 0;
+    ctx.save();
+    ctx.translate(0, gunY);
+    ctx.rotate(angle);
+    ctx.translate(-recoil, 0);
+
+    ctx.strokeStyle = suit;
+    ctx.lineWidth = 7;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(1, 6);
+    ctx.lineTo(15, 9);
+    ctx.stroke();
+
+    ctx.fillStyle = suit;
+    roundRect(ctx, 0, -5.5, 25, 11, 4);
+    ctx.fill();
+    ctx.fillStyle = "#d5f6ff";
+    roundRect(ctx, 23, -3.5, 19, 7, 3);
+    ctx.fill();
+    ctx.fillStyle = accent;
+    roundRect(ctx, 4, -7.5, 15, 3, 1.5);
+    ctx.fill();
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = `rgba(170, 246, 255, ${0.35 + recoil * 0.14})`;
+    ctx.beginPath();
+    ctx.arc(43, 0, 3 + recoil * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.restore();
+
     if (this.isMeleeActive) {
-      ctx.strokeStyle = "rgba(132, 245, 255, 0.75)";
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = "rgba(132, 245, 255, 0.7)";
       ctx.lineWidth = 8;
       ctx.beginPath();
       const meleeDirection = this.getMeleeDirection();
@@ -981,6 +1166,7 @@ window.Player = class Player {
         ctx.arc(-18, -32, 42, Math.PI - 0.4, Math.PI + 1.0);
       }
       ctx.stroke();
+      ctx.restore();
     }
 
     if (this.airDashTimer > 0) {

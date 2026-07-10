@@ -360,6 +360,12 @@ window.Enemy = class Enemy {
   draw(ctx) {
     ctx.save();
     ctx.translate(this.centerX, this.centerY);
+    ctx.shadowBlur = 14;
+    ctx.shadowColor =
+      this.type === "rival" ? "rgba(76, 224, 181, 0.8)" :
+      this.type === "drone" ? "rgba(121, 232, 255, 0.8)" :
+      this.type === "standoff" ? "rgba(255, 183, 109, 0.75)" :
+      "rgba(237, 67, 94, 0.8)";
 
     if (this.type === "drone") {
       ctx.fillStyle = "#79e8ff";

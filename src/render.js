@@ -1,38 +1,130 @@
 "use strict";
 
-window.drawBackground = function drawBackground(ctx) {
-  ctx.clearRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+let bgCache = null;
+let overlayCache = null;
 
-  const gradient = ctx.createLinearGradient(0, 0, 0, CONFIG.canvas.height);
-  gradient.addColorStop(0, "#132131");
-  gradient.addColorStop(0.55, "#09121d");
-  gradient.addColorStop(1, "#04070b");
+function buildBackgroundCache() {
+  const w = CONFIG.canvas.width;
+  const h = CONFIG.canvas.height;
+  const off = document.createElement("canvas");
+  off.width = w;
+  off.height = h;
+  const ctx = off.getContext("2d");
+
+  const gradient = ctx.createLinearGradient(0, 0, 0, h);
+  gradient.addColorStop(0, "#0d1a2b");
+  gradient.addColorStop(0.55, "#070f1a");
+  gradient.addColorStop(1, "#03060a");
   ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+  ctx.fillRect(0, 0, w, h);
 
-  ctx.save();
-  ctx.strokeStyle = "rgba(103, 179, 255, 0.09)";
+  // Distant city glow pools
+  const glows = [
+    { x: w * 0.22, y: h * 0.72, r: 340, color: "rgba(64, 156, 255, 0.10)" },
+    { x: w * 0.78, y: h * 0.66, r: 380, color: "rgba(255, 96, 150, 0.07)" },
+    { x: w * 0.52, y: h * 0.85, r: 460, color: "rgba(72, 221, 255, 0.08)" },
+  ];
+  for (const g of glows) {
+    const rg = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, g.r);
+    rg.addColorStop(0, g.color);
+    rg.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = rg;
+    ctx.fillRect(g.x - g.r, g.y - g.r, g.r * 2, g.r * 2);
+  }
+
+  // Grid that fades with height (denser presence near the floor)
   ctx.lineWidth = 1;
-  for (let x = 0; x <= CONFIG.canvas.width; x += 40) {
+  for (let x = 0; x <= w; x += 40) {
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, "rgba(103, 179, 255, 0.02)");
+    grad.addColorStop(1, "rgba(103, 179, 255, 0.12)");
+    ctx.strokeStyle = grad;
     ctx.beginPath();
     ctx.moveTo(x, 0);
-    ctx.lineTo(x, CONFIG.canvas.height);
+    ctx.lineTo(x, h);
     ctx.stroke();
   }
-  for (let y = 0; y <= CONFIG.canvas.height; y += 40) {
+  for (let y = 0; y <= h; y += 40) {
+    const t = y / h;
+    ctx.strokeStyle = `rgba(103, 179, 255, ${0.02 + t * 0.10})`;
     ctx.beginPath();
     ctx.moveTo(0, y);
-    ctx.lineTo(CONFIG.canvas.width, y);
+    ctx.lineTo(w, y);
     ctx.stroke();
   }
-  ctx.restore();
 
-  ctx.fillStyle = "rgba(33, 55, 75, 0.8)";
-  ctx.fillRect(120, 180, 170, 340);
-  ctx.fillRect(980, 130, 120, 420);
-  ctx.fillRect(805, 240, 60, 310);
-  ctx.fillStyle = "rgba(67, 103, 133, 0.14)";
-  ctx.fillRect(0, 560, CONFIG.canvas.width, 160);
+  // Background structures with neon edge lights and window dots
+  const towers = [
+    { x: 120, y: 180, w: 170, h: 340, edge: "rgba(96, 216, 255, 0.5)" },
+    { x: 980, y: 130, w: 120, h: 420, edge: "rgba(255, 118, 168, 0.45)" },
+    { x: 805, y: 240, w: 60, h: 310, edge: "rgba(140, 240, 255, 0.4)" },
+  ];
+  for (const t of towers) {
+    ctx.fillStyle = "rgba(20, 34, 48, 0.9)";
+    ctx.fillRect(t.x, t.y, t.w, t.h);
+    ctx.strokeStyle = t.edge;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(t.x + 1, t.y + 1, t.w - 2, t.h - 2);
+    ctx.fillStyle = t.edge;
+    ctx.fillRect(t.x, t.y, t.w, 3);
+
+    ctx.fillStyle = "rgba(150, 226, 255, 0.22)";
+    for (let wy = t.y + 18; wy < t.y + t.h - 12; wy += 26) {
+      for (let wx = t.x + 12; wx < t.x + t.w - 10; wx += 22) {
+        if (Math.random() < 0.42) {
+          ctx.fillRect(wx, wy, 8, 5);
+        }
+      }
+    }
+  }
+
+  // Horizon haze above the floor
+  const haze = ctx.createLinearGradient(0, 540, 0, 720);
+  haze.addColorStop(0, "rgba(67, 143, 190, 0)");
+  haze.addColorStop(1, "rgba(67, 143, 190, 0.16)");
+  ctx.fillStyle = haze;
+  ctx.fillRect(0, 540, w, 180);
+
+  return off;
+}
+
+function buildOverlayCache() {
+  const w = CONFIG.canvas.width;
+  const h = CONFIG.canvas.height;
+  const off = document.createElement("canvas");
+  off.width = w;
+  off.height = h;
+  const ctx = off.getContext("2d");
+
+  // Scanlines
+  ctx.fillStyle = "rgba(0, 0, 0, 0.10)";
+  for (let y = 0; y < h; y += 4) {
+    ctx.fillRect(0, y, w, 1);
+  }
+
+  // Vignette
+  const v = ctx.createRadialGradient(w / 2, h / 2, h * 0.46, w / 2, h / 2, h * 0.92);
+  v.addColorStop(0, "rgba(0, 0, 0, 0)");
+  v.addColorStop(1, "rgba(0, 0, 0, 0.32)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, w, h);
+
+  return off;
+}
+
+window.drawBackground = function drawBackground(ctx) {
+  if (!bgCache) {
+    bgCache = buildBackgroundCache();
+  }
+  ctx.clearRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+  ctx.drawImage(bgCache, 0, 0);
+};
+
+window.drawScreenOverlay = function drawScreenOverlay(ctx) {
+  if (!overlayCache) {
+    overlayCache = buildOverlayCache();
+  }
+  ctx.drawImage(overlayCache, 0, 0);
 };
 
 window.drawPlatforms = function drawPlatforms(ctx) {
@@ -43,15 +135,30 @@ window.drawPlatforms = function drawPlatforms(ctx) {
       floorGradient.addColorStop(1, "#0b1219");
       ctx.fillStyle = floorGradient;
       ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+      ctx.save();
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = "rgba(88, 210, 255, 0.7)";
+      ctx.fillStyle = "rgba(120, 216, 255, 0.55)";
+      ctx.fillRect(platform.x, platform.y, platform.width, 2);
+      ctx.restore();
       continue;
     }
 
-    ctx.fillStyle = "#29455d";
+    ctx.fillStyle = "#22394e";
     roundRect(ctx, platform.x, platform.y, platform.width, platform.height, 7);
     ctx.fill();
 
-    ctx.fillStyle = "rgba(111, 201, 255, 0.22)";
-    ctx.fillRect(platform.x + 6, platform.y + 4, platform.width - 12, 4);
+    ctx.save();
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "rgba(111, 201, 255, 0.8)";
+    ctx.fillStyle = "rgba(140, 220, 255, 0.75)";
+    ctx.fillRect(platform.x + 6, platform.y + 3, platform.width - 12, 3);
+    ctx.restore();
+
+    ctx.strokeStyle = "rgba(111, 201, 255, 0.28)";
+    ctx.lineWidth = 1;
+    roundRect(ctx, platform.x, platform.y, platform.width, platform.height, 7);
+    ctx.stroke();
   }
 };
 
@@ -172,6 +279,8 @@ window.drawCrosshair = function drawCrosshair(ctx) {
   ctx.save();
   ctx.translate(input.mouseX, input.mouseY);
   ctx.strokeStyle = "#d9fbff";
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = "rgba(120, 235, 255, 0.9)";
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(-12, 0);
@@ -199,7 +308,10 @@ window.drawGameOver = function drawGameOver(ctx, game) {
   ctx.textAlign = "center";
   ctx.fillStyle = "#ffced4";
   ctx.font = "bold 54px 'Segoe UI', sans-serif";
+  ctx.shadowBlur = 26;
+  ctx.shadowColor = "rgba(255, 96, 128, 0.9)";
   ctx.fillText("GAME OVER", CONFIG.canvas.width / 2, 270);
+  ctx.shadowBlur = 0;
 
   ctx.fillStyle = "#dce9f6";
   ctx.font = "24px 'Segoe UI', sans-serif";
@@ -215,6 +327,7 @@ window.drawGameOver = function drawGameOver(ctx, game) {
 window.drawMenuScene = function drawMenuScene(ctx) {
   drawBackground(ctx);
   drawPlatforms(ctx);
+  drawScreenOverlay(ctx);
 
   ctx.save();
   ctx.translate(310, 520);
@@ -324,6 +437,7 @@ window.renderGame = function renderGame(ctx, game) {
   }
 
   game.player.draw(ctx);
+  drawScreenOverlay(ctx);
   drawCrosshair(ctx);
   drawUi(ctx, game);
 
