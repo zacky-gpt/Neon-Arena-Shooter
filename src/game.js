@@ -100,6 +100,7 @@ window.Game = class Game {
     if (this.player.hp <= 0) {
       this.gameOver = true;
       this.resetMovementCombo();
+      sfx.gameOver();
     }
   }
 
@@ -412,8 +413,19 @@ window.Game = class Game {
 
         const hitDamage = Math.round(bullet.damage * (headshot ? CONFIG.enemy.headshotMultiplier : 1));
         enemy.hp -= hitDamage;
+        enemy.hitFlashTimer = 0.09;
         bullet.alive = false;
+        if (headshot) {
+          sfx.headshot();
+        } else {
+          sfx.hit();
+        }
         this.spawnHitBurst(bullet.x, bullet.y, headshot ? "rgba(255, 238, 132, 0.98)" : "rgba(255, 113, 131, 0.95)");
+        fx.spawnPopup(bullet.x, bullet.y - 10, String(hitDamage), {
+          color: headshot ? "#ffe98a" : "#ffd2d8",
+          size: headshot ? 16 : 12,
+          bold: headshot,
+        });
 
         const comboBonus = this.getMovementComboShotBonus(hitDamage);
         if (comboBonus > 0) {
@@ -441,6 +453,14 @@ window.Game = class Game {
 
       this.player.specialHitEnemies.add(enemy);
       enemy.hp -= special.damage;
+      enemy.hitFlashTimer = 0.12;
+      sfx.meleeHit();
+      fx.shake(5, 0.2);
+      fx.spawnPopup(enemy.centerX, enemy.y - 18, String(special.damage), {
+        color: special.type === "dashKick" ? "#ffe08a" : "#ffb98a",
+        size: 15,
+        bold: true,
+      });
       const knockDirection = special.type === "diveKick"
         ? (Math.sign(enemy.centerX - this.player.centerX) || this.player.facing || 1)
         : (this.player.facing || 1);
@@ -477,6 +497,14 @@ window.Game = class Game {
 
       this.player.meleeHitEnemies.add(enemy);
       enemy.hp -= CONFIG.melee.damage;
+      enemy.hitFlashTimer = 0.1;
+      sfx.meleeHit();
+      fx.shake(3, 0.14);
+      fx.spawnPopup(enemy.centerX, enemy.y - 18, String(CONFIG.melee.damage), {
+        color: "#aef4ff",
+        size: 14,
+        bold: true,
+      });
       enemy.vx = direction * CONFIG.melee.knockbackX;
       enemy.vy = CONFIG.melee.knockbackY;
       enemy.disableContact(CONFIG.enemy.contactDisableOnKnockback);
@@ -501,6 +529,9 @@ window.Game = class Game {
 
       if (damaged) {
         this.resetMovementCombo();
+        sfx.playerHurt();
+        fx.damageFlash();
+        fx.shake(6, 0.28);
         const direction = Math.sign(this.player.centerX - bullet.x) || 1;
         this.player.vx += direction * 180;
         this.player.vy -= 120;
@@ -519,6 +550,9 @@ window.Game = class Game {
 
       if (damaged) {
         this.resetMovementCombo();
+        sfx.playerHurt();
+        fx.damageFlash();
+        fx.shake(7, 0.3);
         const direction = Math.sign(this.player.centerX - enemy.centerX) || 1;
         this.player.vx += direction * 220;
         this.player.vy = -260;
@@ -545,15 +579,55 @@ window.Game = class Game {
       pickup.alive = false;
 
       if (def.kind === "weapon") {
-        this.player.collectWeaponXp(def.weaponXp || 1);
+        const result = this.player.collectWeaponXp(def.weaponXp || 1);
+        if (!result.advanced) {
+          sfx.pickup();
+        }
+        if (result.advanced) {
+          sfx.evolve();
+          fx.spawnPopup(this.player.centerX, this.player.y - 30, "WEAPON EVOLVED", {
+            color: "#8ef3ff",
+            size: 19,
+            bold: true,
+            life: 1.1,
+            rise: -46,
+          });
+          fx.shake(3, 0.18);
+        }
       }
 
       if (def.kind === "ability") {
-        this.player.unlockAbility(def.ability);
+        const unlocked = this.player.unlockAbility(def.ability);
+        if (unlocked) {
+          sfx.unlock();
+          const abilityLabels = {
+            airDash: "AIR DASH",
+            doubleJump: "DOUBLE JUMP",
+            dive: "DIVE",
+            highJump: "HIGH JUMP",
+            dashKick: "DASH KICK",
+            diveKick: "DIVE KICK",
+          };
+          fx.spawnPopup(this.player.centerX, this.player.y - 30, `${abilityLabels[unlocked] || unlocked} UNLOCKED`, {
+            color: "#a6ffd9",
+            size: 19,
+            bold: true,
+            life: 1.1,
+            rise: -46,
+          });
+        }
       }
 
       if (def.kind === "health") {
-        this.player.heal(def.healAmount);
+        if (this.player.heal(def.healAmount)) {
+          sfx.heal();
+          fx.spawnPopup(this.player.centerX, this.player.y - 24, `+${def.healAmount}`, {
+            color: "#9dffb0",
+            size: 15,
+            bold: true,
+            life: 0.8,
+          });
+        }
       }
 
       this.spawnHitBurst(pickup.centerX, pickup.centerY, def.glow);
@@ -566,7 +640,17 @@ window.Game = class Game {
     }
 
     enemy.defeated = true;
-    this.score += enemy.type === "rival" ? CONFIG.duel.rivalScoreValue : CONFIG.enemy.scoreValue;
+    const scoreValue = enemy.type === "rival" ? CONFIG.duel.rivalScoreValue : CONFIG.enemy.scoreValue;
+    this.score += scoreValue;
+    sfx.enemyDeath(enemy.type === "rival");
+    fx.hitStop(enemy.type === "rival" ? 0.09 : 0.05);
+    fx.shake(enemy.type === "rival" ? 6 : 3.5, 0.22);
+    fx.spawnPopup(enemy.centerX, enemy.y - 34, `+${scoreValue}`, {
+      color: "#ffe9a6",
+      size: enemy.type === "rival" ? 18 : 14,
+      bold: true,
+      life: 0.75,
+    });
     this.spawnDeathBurst(enemy.centerX, enemy.centerY);
     this.trySpawnPickup(enemy.centerX, enemy.centerY);
   }
@@ -596,6 +680,7 @@ window.Game = class Game {
       }
 
       enemy.hp -= CONFIG.diveKick.shockwaveDamage;
+      enemy.hitFlashTimer = 0.12;
       const direction = Math.sign(enemy.centerX - centerX) || facing || 1;
       enemy.vx = direction * CONFIG.diveKick.shockwaveKnockbackX;
       enemy.vy = CONFIG.diveKick.shockwaveKnockbackY;
@@ -606,6 +691,21 @@ window.Game = class Game {
         this.defeatEnemy(enemy);
       }
     }
+
+    sfx.shockwave();
+    fx.shake(5.5, 0.24);
+    this.particles.push(new Particle({
+      x: centerX,
+      y: groundY,
+      vx: 0,
+      vy: 0,
+      radius: 10,
+      life: 0.3,
+      color: "rgba(255, 190, 120, 0.9)",
+      shape: "ring",
+      gravity: 0,
+      growth: 420,
+    }));
 
     for (let i = 0; i < 14; i += 1) {
       this.particles.push(new Particle({
@@ -635,6 +735,37 @@ window.Game = class Game {
   }
 
   spawnDeathBurst(x, y) {
+    // Expanding shockwave ring
+    this.particles.push(new Particle({
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      radius: 8,
+      life: 0.34,
+      color: "rgba(255, 190, 130, 0.9)",
+      shape: "ring",
+      gravity: 0,
+      growth: 330,
+    }));
+
+    // Fast spark streaks
+    for (let i = 0; i < 9; i += 1) {
+      const angle = randomRange(0, Math.PI * 2);
+      const speed = randomRange(320, 640);
+      this.particles.push(new Particle({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: randomRange(2.5, 4.5),
+        life: randomRange(0.16, 0.3),
+        color: Math.random() < 0.5 ? "rgba(255, 224, 150, 0.95)" : "rgba(255, 140, 120, 0.95)",
+        shape: "spark",
+        gravity: 140,
+      }));
+    }
+
     for (let i = 0; i < CONFIG.effects.enemyDeathParticles; i += 1) {
       this.particles.push(new Particle({
         x,

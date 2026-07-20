@@ -25,6 +25,7 @@ window.Enemy = class Enemy {
     this.rivalRollTimer = 0;
     this.rivalRollDirection = 1;
     this.rivalRollCooldown = randomRange(CONFIG.duel.rivalRollCooldownMin, CONFIG.duel.rivalRollCooldownMax);
+    this.hitFlashTimer = 0;
   }
 
   get centerX() {
@@ -38,6 +39,7 @@ window.Enemy = class Enemy {
   update(dt, player, game) {
     this.contactCooldown -= dt;
     this.contactDisabledTimer = Math.max(0, this.contactDisabledTimer - dt);
+    this.hitFlashTimer = Math.max(0, this.hitFlashTimer - dt);
     this.shootCooldown -= dt;
 
     this.jumpCooldown -= dt;
@@ -208,6 +210,7 @@ window.Enemy = class Enemy {
 
     const angle = Math.atan2(dy, dx);
     const speedMultiplier = this.type === "drone" ? 1.08 : this.type === "standoff" ? 0.94 : this.type === "rival" ? 1.02 : 1;
+    sfx.enemyShoot();
     game.enemyBullets.push(new EnemyBullet(
       this.centerX,
       muzzleY,
@@ -360,6 +363,9 @@ window.Enemy = class Enemy {
   draw(ctx) {
     ctx.save();
     ctx.translate(this.centerX, this.centerY);
+    if (this.hitFlashTimer > 0) {
+      ctx.filter = "brightness(2.1) saturate(1.3)";
+    }
     ctx.shadowBlur = 14;
     ctx.shadowColor =
       this.type === "rival" ? "rgba(76, 224, 181, 0.8)" :

@@ -66,6 +66,8 @@ function startGame() {
   canvas.height = CONFIG.canvas.height;
   window.platforms = createPlatforms(CONFIG);
   window.game = new Game();
+  fx.reset();
+  sfx.start();
   appState.screen = "playing";
   hideTitle();
 }
@@ -77,6 +79,7 @@ function restartGame() {
   }
 
   window.game = new Game();
+  fx.reset();
   appState.screen = "playing";
   hideTitle();
 }
@@ -117,8 +120,10 @@ function loop(timestamp) {
   const dt = Math.min((timestamp - lastTime) / 1000, 1 / 30);
   lastTime = timestamp;
 
+  fx.update(dt);
+
   if (appState.screen === "playing" && window.game) {
-    window.game.update(dt);
+    window.game.update(fx.applyHitStop(dt));
     renderGame(ctx, window.game);
   } else {
     drawMenuScene(ctx);

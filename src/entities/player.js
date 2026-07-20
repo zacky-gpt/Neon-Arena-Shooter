@@ -380,6 +380,7 @@ window.Player = class Player {
       this.tryStand();
       this.vy = CONFIG.player.jumpVelocity;
       this.onGround = false;
+      sfx.jump();
     }
   }
 
@@ -421,6 +422,7 @@ window.Player = class Player {
 
   startDoubleJump(moveInput, game) {
     game.registerMovementAction("doubleJump");
+    sfx.jump();
     this.doubleJumpAvailable = false;
     const carryRise = Math.min(this.vy, 0) * CONFIG.doubleJump.upwardCarryFactor;
     this.vy = Math.max(CONFIG.doubleJump.launchVelocity + carryRise, CONFIG.doubleJump.maxRiseSpeed);
@@ -433,6 +435,7 @@ window.Player = class Player {
 
   startAirDash(moveInput, game) {
     game.registerMovementAction("airDash");
+    sfx.dash();
     this.airAction = "airDash";
     this.airDashAvailable = false;
     this.airDashTimer = CONFIG.airDash.duration;
@@ -445,6 +448,7 @@ window.Player = class Player {
 
   startDive(game) {
     game.registerMovementAction("dive");
+    sfx.dash();
     this.airAction = "dive";
     this.diveAvailable = false;
     this.airDashTimer = 0;
@@ -456,6 +460,7 @@ window.Player = class Player {
 
   startHighJump(moveInput, game) {
     game.registerMovementAction("highJump");
+    sfx.jump();
     this.landingLagTimer = 0;
     this.landingLagRollCancelable = true;
     this.tryStand();
@@ -470,6 +475,7 @@ window.Player = class Player {
 
   startDashKick(game) {
     game.registerMovementAction("flyingKick");
+    sfx.dash();
     this.airAction = "dashKick";
     this.airDashTimer = 0;
     this.dashKickTimer = CONFIG.dashKick.duration;
@@ -482,6 +488,7 @@ window.Player = class Player {
 
   startDiveKick(game) {
     game.registerMovementAction("flyingKick");
+    sfx.dash();
     this.airAction = "diveKick";
     this.diveTimer = 0;
     this.diveKickTimer = CONFIG.diveKick.duration;
@@ -496,12 +503,14 @@ window.Player = class Player {
     const dashDirection = Math.sign(this.vx) || this.facing || 1;
     this.vx = moveToward(this.vx, dashDirection * CONFIG.airDash.speed, CONFIG.airDash.speed * 4 * dt);
     this.spawnBoostTrail(game, -dashDirection, 0.12, 2);
+    fx.spawnGhost(this);
   }
 
   updateDive(dt, game) {
     this.vx = moveToward(this.vx, 0, CONFIG.player.acceleration * dt);
     this.vy = moveToward(this.vy, CONFIG.dive.speed, CONFIG.dive.speed * 4 * dt);
     this.spawnBoostTrail(game, 0, -0.18, 2);
+    fx.spawnGhost(this, "110, 255, 186");
   }
 
   updateDashKick(dt, game) {
@@ -509,25 +518,41 @@ window.Player = class Player {
     this.vx = moveToward(this.vx, direction * CONFIG.dashKick.speed, CONFIG.dashKick.speed * 5 * dt);
     this.vy = moveToward(this.vy, CONFIG.dashKick.verticalSpeed, CONFIG.dashKick.speed * 3 * dt);
     this.spawnBoostTrail(game, -direction, 0.08, 2);
+    fx.spawnGhost(this, "255, 221, 122");
   }
 
   updateDiveKick(dt, game) {
     this.vx = moveToward(this.vx, 0, CONFIG.player.acceleration * dt);
     this.vy = moveToward(this.vy, CONFIG.diveKick.speed, CONFIG.diveKick.speed * 4 * dt);
     this.spawnBoostTrail(game, 0, -0.25, 2);
+    fx.spawnGhost(this, "255, 160, 102");
   }
 
   applyAirBoost(dt, game) {
-    if (this.isRolling || this.airAction !== "none" || !input.boost || this.boostLockTimer > 0 || this.boost <= 0) {
+    if (this.airAction !== "none" || !input.boost || this.boostLockTimer > 0 || this.boost <= 0) {
       return;
     }
 
-    if (this.onGround) {
-      this.onGround = false;
+    if (this.isRolling) {
+      if (this.onGround) {
+        return;
+      }
+      // Rolled off a ledge: boost cancels the roll mid-air
+      this.endRoll();
     }
 
-    this.vy -= CONFIG.boost.acceleration * dt;
-    this.vy = Math.max(this.vy, CONFIG.boost.maxRiseSpeed);
+    if (this.onGround) {
+      // Initial hop so ground boosts feel punchy instead of a slow lift-off
+      this.onGround = false;
+      this.vy = Math.min(this.vy, CONFIG.boost.groundKickVelocity);
+      this.spawnBoostTrail(game, 0, 1, 5);
+      sfx.boostKick();
+    }
+
+    // Boost thrust never pushes past the rise cap, but a faster start (ground kick) keeps its momentum
+    if (this.vy > CONFIG.boost.maxRiseSpeed) {
+      this.vy = Math.max(this.vy - CONFIG.boost.acceleration * dt, CONFIG.boost.maxRiseSpeed);
+    }
     this.boost = Math.max(0, this.boost - CONFIG.boost.drainPerSecond * dt);
     this.spawnBoostTrail(game, 0, 1, 3);
 
@@ -539,6 +564,7 @@ window.Player = class Player {
 
   startRoll(direction, game, actionName = "roll") {
     game.registerMovementAction(actionName);
+    sfx.dash();
     this.isRolling = true;
     this.isCrouching = false;
     this.rollDirection = Math.sign(direction) || this.facing || 1;
@@ -570,6 +596,7 @@ window.Player = class Player {
     }
 
     this.spawnBoostTrail(game, -this.rollDirection, 0.18);
+    fx.spawnGhost(this);
 
     if (this.rollTimer <= 0) {
       this.endRoll();
@@ -810,6 +837,7 @@ window.Player = class Player {
 
     const weapon = this.currentWeapon;
     this.fireCooldown = weapon.fireRate;
+    sfx.shoot(this.weaponStage);
     const baseAngle = this.aimAngle;
     const muzzle = this.muzzle;
     const projectileCount = weapon.projectileCount || 1;

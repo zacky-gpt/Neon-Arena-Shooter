@@ -1,9 +1,10 @@
 "use strict";
 
-let bgCache = null;
+let skyCache = null;
+let towerCache = null;
 let overlayCache = null;
 
-function buildBackgroundCache() {
+function buildSkyCache() {
   const w = CONFIG.canvas.width;
   const h = CONFIG.canvas.height;
   const off = document.createElement("canvas");
@@ -53,6 +54,24 @@ function buildBackgroundCache() {
     ctx.stroke();
   }
 
+  // Horizon haze above the floor
+  const haze = ctx.createLinearGradient(0, 540, 0, 720);
+  haze.addColorStop(0, "rgba(67, 143, 190, 0)");
+  haze.addColorStop(1, "rgba(67, 143, 190, 0.16)");
+  ctx.fillStyle = haze;
+  ctx.fillRect(0, 540, w, 180);
+
+  return off;
+}
+
+function buildTowerCache() {
+  const w = CONFIG.canvas.width;
+  const h = CONFIG.canvas.height;
+  const off = document.createElement("canvas");
+  off.width = w;
+  off.height = h;
+  const ctx = off.getContext("2d");
+
   // Background structures with neon edge lights and window dots
   const towers = [
     { x: 120, y: 180, w: 170, h: 340, edge: "rgba(96, 216, 255, 0.5)" },
@@ -77,13 +96,6 @@ function buildBackgroundCache() {
       }
     }
   }
-
-  // Horizon haze above the floor
-  const haze = ctx.createLinearGradient(0, 540, 0, 720);
-  haze.addColorStop(0, "rgba(67, 143, 190, 0)");
-  haze.addColorStop(1, "rgba(67, 143, 190, 0.16)");
-  ctx.fillStyle = haze;
-  ctx.fillRect(0, 540, w, 180);
 
   return off;
 }
@@ -112,12 +124,16 @@ function buildOverlayCache() {
   return off;
 }
 
-window.drawBackground = function drawBackground(ctx) {
-  if (!bgCache) {
-    bgCache = buildBackgroundCache();
+window.drawBackground = function drawBackground(ctx, parallaxX = 0) {
+  if (!skyCache) {
+    skyCache = buildSkyCache();
+  }
+  if (!towerCache) {
+    towerCache = buildTowerCache();
   }
   ctx.clearRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
-  ctx.drawImage(bgCache, 0, 0);
+  ctx.drawImage(skyCache, 0, 0);
+  ctx.drawImage(towerCache, parallaxX, 0);
 };
 
 window.drawScreenOverlay = function drawScreenOverlay(ctx) {
@@ -326,6 +342,7 @@ window.drawGameOver = function drawGameOver(ctx, game) {
 
 window.drawMenuScene = function drawMenuScene(ctx) {
   drawBackground(ctx);
+  fx.drawEmbers(ctx);
   drawPlatforms(ctx);
   drawScreenOverlay(ctx);
 
@@ -410,10 +427,45 @@ window.drawEnemyHpBar = function drawEnemyHpBar(ctx, enemy) {
   ctx.restore();
 };
 
+window.drawDamageOverlays = function drawDamageOverlays(ctx, game) {
+  const w = CONFIG.canvas.width;
+  const h = CONFIG.canvas.height;
+  const hpRatio = game.player.hp / CONFIG.player.maxHp;
+
+  // Pulsing red vignette when close to death
+  if (!game.gameOver && hpRatio < 0.35) {
+    const danger = 1 - hpRatio / 0.35;
+    const pulse = 0.72 + Math.sin(performance.now() / 1000 * 5.2) * 0.28;
+    const v = ctx.createRadialGradient(w / 2, h / 2, h * 0.38, w / 2, h / 2, h * 0.85);
+    v.addColorStop(0, "rgba(255, 40, 70, 0)");
+    v.addColorStop(1, `rgba(255, 40, 70, ${0.24 * danger * pulse})`);
+    ctx.fillStyle = v;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // Sharp edge flash right after taking a hit
+  if (fx.damageFlashTimer > 0) {
+    const flash = fx.damageFlashTimer / 0.26;
+    const v = ctx.createRadialGradient(w / 2, h / 2, h * 0.3, w / 2, h / 2, h * 0.8);
+    v.addColorStop(0, "rgba(255, 60, 90, 0)");
+    v.addColorStop(1, `rgba(255, 60, 90, ${0.38 * flash})`);
+    ctx.fillStyle = v;
+    ctx.fillRect(0, 0, w, h);
+  }
+};
+
 window.renderGame = function renderGame(ctx, game) {
-  drawBackground(ctx);
+  const shakeOffset = fx.getShakeOffset();
+  const parallaxX = (CONFIG.canvas.width / 2 - game.player.centerX) * 0.045;
+
+  ctx.save();
+  ctx.translate(shakeOffset.x, shakeOffset.y);
+
+  drawBackground(ctx, parallaxX);
+  fx.drawEmbers(ctx);
   drawPlatforms(ctx);
   drawSpawnWarnings(ctx, game);
+  fx.drawGhosts(ctx);
 
   for (const particle of game.particles) {
     particle.draw(ctx);
@@ -437,7 +489,11 @@ window.renderGame = function renderGame(ctx, game) {
   }
 
   game.player.draw(ctx);
+  fx.drawPopups(ctx);
+  ctx.restore();
+
   drawScreenOverlay(ctx);
+  drawDamageOverlays(ctx, game);
   drawCrosshair(ctx);
   drawUi(ctx, game);
 
